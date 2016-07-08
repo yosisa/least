@@ -5,6 +5,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 
 	"golang.org/x/crypto/ssh/terminal"
@@ -57,6 +58,8 @@ func main() {
 type Pager struct {
 	lines          []string
 	incompleteLine bool
+	width          int
+	height         int
 	viewX          int
 }
 
@@ -85,24 +88,44 @@ func (p *Pager) PollEvent() {
 }
 
 func (p *Pager) handleKeyEvent(ev termbox.Event) bool {
-	_, height := termbox.Size()
+	p.width, p.height = termbox.Size()
 	switch ev.Key {
+	case termbox.KeyCtrlN, termbox.KeyArrowDown, termbox.KeyEnter:
+		p.scrollDown(1)
+	case termbox.KeyCtrlP, termbox.KeyArrowUp:
+		p.scrollUp(1)
+	case termbox.KeyCtrlU:
+		p.scrollUp(int(math.Ceil(float64(p.height) / 2)))
+	case termbox.KeyCtrlD:
+		p.scrollDown(int(math.Ceil(float64(p.height) / 2)))
+	case termbox.KeyCtrlF, termbox.KeySpace, termbox.KeyPgdn:
+		p.scrollDown(max(0, p.height-3))
+	case termbox.KeyCtrlB, termbox.KeyPgup:
+		p.scrollUp(max(0, p.height-3))
 	default:
 		switch ev.Ch {
 		case 'j':
-			p.viewX = min(p.viewX+1, max(0, len(p.lines)-height))
+			p.scrollDown(1)
 		case 'k':
-			p.viewX = max(0, p.viewX-1)
+			p.scrollUp(1)
 		case 'g':
 			p.viewX = 0
 		case 'G':
-			p.viewX = max(0, len(p.lines)-height)
+			p.viewX = max(0, len(p.lines)-p.height)
 		case 'q':
 			return false
 		}
-		p.Redraw()
 	}
+	p.Redraw()
 	return true
+}
+
+func (p *Pager) scrollUp(n int) {
+	p.viewX = max(0, p.viewX-n)
+}
+
+func (p *Pager) scrollDown(n int) {
+	p.viewX = min(p.viewX+n, max(0, len(p.lines)-p.height))
 }
 
 func (p *Pager) Redraw() {
