@@ -107,16 +107,53 @@ func (p *Pager) handleKeyEvent(ev termbox.Event) bool {
 
 func (p *Pager) Redraw() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+
 	var x, y int
+	var buf []rune
+	fg, bg := termbox.ColorDefault, termbox.ColorDefault
+	mode := modeNormal
 	for _, line := range p.lines[p.viewX:] {
 		for _, r := range line {
-			switch r {
-			case '\t':
-				x += *tabWidth
+			switch mode {
+			case modeNormal:
+				switch r {
+				case '\t':
+					x += *tabWidth
+					continue
+				case '\033':
+					mode = modeEscaped
+					continue
+				}
+			case modeEscaped:
+				switch r {
+				case '[':
+					mode = modeEscapeSequence
+					continue
+				default:
+					mode = modeNormal
+				}
+			case modeEscapeSequence:
+				switch r {
+				case ';':
+					if fn, ok := ansiColors[string(buf)]; ok {
+						fn(&fg, &bg)
+					}
+					buf = nil
+				case 'm':
+					if fn, ok := ansiColors[string(buf)]; ok {
+						fn(&fg, &bg)
+					}
+					buf = nil
+					mode = modeNormal
+				case 'K':
+					mode = modeNormal
+				default:
+					buf = append(buf, r)
+				}
 				continue
 			}
 
-			termbox.SetCell(x, y, r, termbox.ColorDefault, termbox.ColorDefault)
+			termbox.SetCell(x, y, r, fg, bg)
 			w := runewidth.RuneWidth(r)
 			if w == 0 || (w == 2 && runewidth.IsAmbiguousWidth(r)) {
 				w = 1
