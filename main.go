@@ -141,7 +141,7 @@ func (p *Pager) Redraw() {
 			case modeNormal:
 				switch r {
 				case '\t':
-					x += *tabWidth
+					x = int((x+*tabWidth) / *tabWidth) * *tabWidth
 					continue
 				case '\033':
 					mode = modeEscaped
